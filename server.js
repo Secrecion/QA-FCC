@@ -19,10 +19,6 @@ const cookieParser= require('cookie-parser');
 const URI = process.env.MONGO_URI;
 const store = new MongoStore({ url: URI });
 
-
-
-
-
 app.set("view engine", "pug");
 app.set("views", "./views/pug");
 
@@ -33,7 +29,7 @@ app.use(
     saveUninitialized: true,
     cookie: { secure: false },
     key: 'express.sid',
-  store: store
+    store: store
   })
 );
 
@@ -46,7 +42,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 io.use(
-  passportSocketIo.authorize({
+    passportSocketIo.authorize({
     cookieParser: cookieParser,
     key: 'express.sid',
     secret: process.env.SESSION_SECRET,
@@ -63,18 +59,28 @@ io.use(
 myDB(async (client) => {
 
   const myDataBase = await client.db("database").collection("users");
+
   routes(app, myDataBase);
   auth(app, myDataBase);
+
   let currentUsers = 0;
   io.on('connection', socket => {
     ++currentUsers;
-    io.emit('user count', currentUsers);
+    io.emit('user', {
+      username: socket.request.user.username,
+      currentUsers,
+      connected: true
+    });
     console.log('A user has connected');
 
     socket.on('disconnect', () => {
       console.log('user ' + socket.request.user.username + ' connected');
       --currentUsers;
-      io.emit('user count', currentUsers);
+      io.emit('user', {
+        username: socket.request.user.username,
+        currentUsers,
+        connected: false
+      });
     });
 
   });
@@ -97,9 +103,6 @@ function onAuthorizeFail(data, message, error, accept) {
   console.log('failed connection to socket.io:', message);
   accept(null, false);
 }
-
-
-
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
